@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useReducer, useState } from "react"
+import { checkWin, getOpponentColor } from "./utils"
 import Robot from "./Robot"
+
 
 const App = () => {
   const colors = ['w', 'b']
 
-  const [myColor] = useState(() => colors[Math.floor(Math.random() * colors.length)]);
-  const [messageText, setMessageText] = useState('')
+  const [myColor] = useState(() => colors[Math.floor(Math.random() * colors.length)])
+  const [messageText, setMessageText] = useState(myColor == 'w' ? "You are playing with WHITE checkers" : "You are playing with BLACK checkers")
   const [liftedCheckerPos, setLiftedCheckerPos] = useState(null)
-  const [difficulty, setDifficulty] = useState(1)
+  const [difficulty, setDifficulty] = useState(localStorage.getItem('difficulty') ? parseInt(localStorage.getItem('difficulty')) : 1)
+  const [gameIsActive, setGameIsActive] = useState(true)
+  const [isMyMove, setIsMyMove] = useState(true)
   const [board, setBoard] = useState([
     ['', 'w', '', 'w', ''],
     ['', '', 'b', '', ''],
@@ -16,12 +20,43 @@ const App = () => {
     ['', 'b', '', 'b', ''],
   ])
 
-  const onCellClick = (row, col) => {
-    console.log(difficulty)
+  useEffect(() => {
+    localStorage.setItem('difficulty', difficulty)
+  }, [difficulty])
+
+  const onCellClick = async (row, col) => {
+    if (!gameIsActive) {
+      return
+    }
+
+    if (!isMyMove) {
+      return
+    }
+
     if (isMyChecker(row, col)) {
       setLiftedCheckerPos([row, col])
     } else if (liftedCheckerPos != null && moveIsPossible(liftedCheckerPos[0], liftedCheckerPos[1], row, col)) {
       myMove(liftedCheckerPos[0], liftedCheckerPos[1], row, col)
+
+      if (checkWin(board) != null) {
+        setMessageText("You won. Reload page to play again")
+        setGameIsActive(false)
+        return
+      }
+
+      setMessageText("Computer is thinking")
+
+      setTimeout(() => {
+        robotMove()
+
+        if (checkWin(board) != null) {
+          setMessageText("Robot won. Reload page to play again")
+          setGameIsActive(false)
+          return
+        }
+
+        setMessageText("You can move now")
+      }, 100)
     }
   }
 
@@ -47,105 +82,28 @@ const App = () => {
 
   const myMove = (fromRow, fromCol, toRow, toCol) => {
     placeChecker(fromRow, fromCol, toRow, toCol)
-    setLiftedCheckerPos(null)
 
-    if (checkWin()) {
-      setMessageText("You won")
-      resetBoard()
-    }
+    setLiftedCheckerPos(null)
+    setIsMyMove(false)
   }
 
   const robotMove = () => {
-    /*
-    setMessageText("Computer is thinking")
+    const robotColor = getOpponentColor(myColor)
 
-    [fromRow, fromCol, toRow, toCol] = Robot.move(difficulty)
-
+    const [fromRow, fromCol, toRow, toCol] = Robot.getNextMove(board, robotColor, difficulty)
     placeChecker(fromRow, fromCol, toRow, toCol)
 
-    setMessageText('')
-
-    if (checkWin()) {
-      setMessageText("Enemy won")
-      resetBoard()
-    }
-    */
+    setIsMyMove(true)
   }
 
   const placeChecker = (fromRow, fromCol, toRow, toCol) => {
-    var tempBoard = board
-    var temp = board[fromRow][fromCol]
+    const tempBoard = board
+    const temp = board[fromRow][fromCol]
 
     tempBoard[fromRow][fromCol] = tempBoard[toRow][toCol]
     tempBoard[toRow][toCol] = temp
 
     setBoard(tempBoard)
-  }
-
-  const checkWin = () => {
-    const hasWinningLine = (color, row1, col1, row2, col2, row3, col3) => {
-      return (
-        board[row1][col1] === color &&
-        board[row2][col2] === color &&
-        board[row3][col3] === color
-      );
-    };
-
-    // Check all rows
-    for (let row = 0; row < board.length; row++) {
-      for (let col = 0; col <= board[row].length - 3; col++) {
-        if (hasWinningLine('w', row, col, row, col + 1, row, col + 2) ||
-          hasWinningLine('b', row, col, row, col + 1, row, col + 2)) {
-          setMessageText(`${board[row][col]} wins!`);
-          return true;
-        }
-      }
-    }
-
-    // Check all columns
-    for (let col = 0; col < board[0].length; col++) {
-      for (let row = 0; row <= board.length - 3; row++) {
-        if (hasWinningLine('w', row, col, row + 1, col, row + 2, col) ||
-          hasWinningLine('b', row, col, row + 1, col, row + 2, col)) {
-          setMessageText(`${board[row][col]} wins!`);
-          return true;
-        }
-      }
-    }
-
-    // Check diagonals (top-left to bottom-right)
-    for (let row = 0; row <= board.length - 3; row++) {
-      for (let col = 0; col <= board[row].length - 3; col++) {
-        if (hasWinningLine('w', row, col, row + 1, col + 1, row + 2, col + 2) ||
-          hasWinningLine('b', row, col, row + 1, col + 1, row + 2, col + 2)) {
-          setMessageText(`${board[row][col]} wins!`);
-          return true;
-        }
-      }
-    }
-
-    // Check diagonals (bottom-left to top-right)
-    for (let row = 2; row < board.length; row++) {
-      for (let col = 0; col <= board[row].length - 3; col++) {
-        if (hasWinningLine('w', row, col, row - 1, col + 1, row - 2, col + 2) ||
-          hasWinningLine('b', row, col, row - 1, col + 1, row - 2, col + 2)) {
-          setMessageText(`${board[row][col]} wins!`);
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  const resetBoard = () => {
-    setBoard([
-      ['', 'w', '', 'w', ''],
-      ['', '', 'b', '', ''],
-      ['', '', '', '', ''],
-      ['', '', 'w', '', ''],
-      ['', 'b', '', 'b', ''],
-    ])
   }
 
   return (
@@ -169,11 +127,11 @@ const App = () => {
                 <td
                   key={`${rowIndex}-${colIndex}`}
                   className={`size-24 border 'border-slate-500' ${liftedCheckerPos != null && rowIndex == liftedCheckerPos[0] && colIndex == liftedCheckerPos[1] ? 'bg-blue-400' : 'bg-blue-300'}`}
-                  onClick={() => { onCellClick(rowIndex, colIndex); }}
+                  onClick={() => { onCellClick(rowIndex, colIndex) }}
                 >
 
-                  {col === 'b' && <img src="black.png" alt="black piece" />}
-                  {col === 'w' && <img src="white.png" alt="white piece" />}
+                  {col == 'b' && <img src="black.png" alt="black piece" />}
+                  {col == 'w' && <img src="white.png" alt="white piece" />}
                 </td>
               ))}
             </tr>
@@ -182,20 +140,20 @@ const App = () => {
       </table>
 
       <label htmlFor="easy">Easy difficulty</label>
-      <input name="difficulty" type="radio" id="easy" onChange={() => { setDifficulty(1) }}></input>
+      <input name="difficulty" type="radio" id="easy" checked={difficulty == 1} onChange={() => { setDifficulty(1) }}></input>
 
       <label htmlFor="medium">Medium difficulty</label>
-      <input name="difficulty" type="radio" id="medium" onChange={() => { setDifficulty(2) }}></input>
+      <input name="difficulty" type="radio" id="medium" checked={difficulty == 2} onChange={() => { setDifficulty(2) }}></input>
 
       <label htmlFor="hard">Hard difficulty</label>
-      <input name="difficulty" type="radio" id="hard" onChange={() => { setDifficulty(3) }}></input>
+      <input name="difficulty" type="radio" id="hard" checked={difficulty == 3} onChange={() => { setDifficulty(3) }}></input>
 
       <h1 className="text-lime-500 text-5xl">
         {messageText}
       </h1>
     </div>
 
-  );
+  )
 }
 
-export default App;
+export default App
