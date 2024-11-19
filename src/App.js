@@ -1,17 +1,19 @@
-import { useEffect, useReducer, useState } from "react"
-import { checkWin, getOpponentColor } from "./utils"
+import { useEffect, useState } from "react"
+import { checkWin, getOpponentColor, countOccurrences } from "./utils"
 import Robot from "./Robot"
 
 
 const App = () => {
   const colors = ['w', 'b']
+  const timeout = 100
 
   const [myColor] = useState(() => colors[Math.floor(Math.random() * colors.length)])
-  const [messageText, setMessageText] = useState(myColor == 'w' ? "You are playing with WHITE checkers" : "You are playing with BLACK checkers")
+  const [messageText, setMessageText] = useState(myColor == 'b' ? "BLACK" : "WHITE (Click to start)")
   const [liftedCheckerPos, setLiftedCheckerPos] = useState(null)
   const [difficulty, setDifficulty] = useState(localStorage.getItem('difficulty') ? parseInt(localStorage.getItem('difficulty')) : 1)
+  const [gameHasStarted, setGameHasStarted] = useState(false)
   const [gameIsActive, setGameIsActive] = useState(true)
-  const [isMyMove, setIsMyMove] = useState(true)
+  const [isMyMove, setIsMyMove] = useState(myColor == 'b')
   const [board, setBoard] = useState([
     ['', 'w', '', 'w', ''],
     ['', '', 'b', '', ''],
@@ -19,12 +21,34 @@ const App = () => {
     ['', '', 'w', '', ''],
     ['', 'b', '', 'b', ''],
   ])
+  const [boardHistory, setBoardHistory] = useState([])
 
   useEffect(() => {
     localStorage.setItem('difficulty', difficulty)
   }, [difficulty])
 
-  const onCellClick = async (row, col) => {
+  useEffect(() => {
+    const isGameEnd = checkGameEnd()
+
+    setTimeout(() => {
+      if (gameHasStarted && !isMyMove && !isGameEnd) {
+        robotMove()
+
+        setIsMyMove(true)
+      }
+    }, timeout);
+
+  }, [isMyMove, gameHasStarted])
+
+  useEffect(() => {
+    setBoardHistory((prev) => ([...prev, board]))
+  }, [board])
+
+  const onCellClick = (row, col) => {
+    if (!gameHasStarted) {
+      setGameHasStarted(true)
+    }
+
     if (!gameIsActive) {
       return
     }
@@ -37,26 +61,6 @@ const App = () => {
       setLiftedCheckerPos([row, col])
     } else if (liftedCheckerPos != null && moveIsPossible(liftedCheckerPos[0], liftedCheckerPos[1], row, col)) {
       myMove(liftedCheckerPos[0], liftedCheckerPos[1], row, col)
-
-      if (checkWin(board) != null) {
-        setMessageText("You won. Reload page to play again")
-        setGameIsActive(false)
-        return
-      }
-
-      setMessageText("Computer is thinking")
-
-      setTimeout(() => {
-        robotMove()
-
-        if (checkWin(board) != null) {
-          setMessageText("Robot won. Reload page to play again")
-          setGameIsActive(false)
-          return
-        }
-
-        setMessageText("You can move now")
-      }, 100)
     }
   }
 
@@ -83,8 +87,9 @@ const App = () => {
   const myMove = (fromRow, fromCol, toRow, toCol) => {
     placeChecker(fromRow, fromCol, toRow, toCol)
 
-    setLiftedCheckerPos(null)
     setIsMyMove(false)
+
+    setLiftedCheckerPos(null)
   }
 
   const robotMove = () => {
@@ -92,12 +97,10 @@ const App = () => {
 
     const [fromRow, fromCol, toRow, toCol] = Robot.getNextMove(board, robotColor, difficulty)
     placeChecker(fromRow, fromCol, toRow, toCol)
-
-    setIsMyMove(true)
   }
 
   const placeChecker = (fromRow, fromCol, toRow, toCol) => {
-    const tempBoard = board
+    const tempBoard = board.map(row => row.slice())
     const temp = board[fromRow][fromCol]
 
     tempBoard[fromRow][fromCol] = tempBoard[toRow][toCol]
@@ -105,6 +108,30 @@ const App = () => {
 
     setBoard(tempBoard)
   }
+
+  const checkDraw = () => {
+    return countOccurrences(boardHistory, board) >= 3
+  }
+
+  const checkGameEnd = () => {
+    const winColor = checkWin(board)
+    const isDraw = checkDraw(board)
+    const isEnd = isDraw || winColor != null
+
+    if (isEnd) {
+      setGameIsActive(false)
+    }
+
+    if (winColor != null) {
+      setMessageText(winColor == 'b' ? "BLACK WINS" : "WHITE WINS")
+    } else if (isDraw) {
+      setMessageText("DRAW")
+    }
+
+    return isEnd
+  }
+
+  const countOccurrences = (arr, val) => arr.reduce((a, v) => (v === val ? a + 1 : a), 0)
 
   return (
     <div className="flex flex-col justify-center items-center h-screen">
