@@ -12,7 +12,7 @@ class Robot {
         if (checkWin(board) != null) {
             return [maximizingPlayer ? -Infinity : Infinity, null]
         }
-        
+
         if (depth == 0) {
             return [this._evaluateBoard(board, color), null]
         }
@@ -60,7 +60,7 @@ class Robot {
 
             return [minEval, bestMove]
         }
-    }    
+    }
 
     static _getChildBoardsWithMoves(board, color) {
         const directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [-1, 1], [1, -1]]

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { checkWin, getOpponentColor, countOccurrences } from "./utils"
+import { checkWin, getOpponentColor } from "./utils"
 import Robot from "./Robot"
 
 
@@ -8,11 +8,10 @@ const App = () => {
   const timeout = 100
 
   const [myColor] = useState(() => colors[Math.floor(Math.random() * colors.length)])
-  const [messageText, setMessageText] = useState(myColor == 'b' ? "BLACK" : "WHITE (Click to start)")
+  const [messageText, setMessageText] = useState(myColor == 'b' ? "BLACK" : "WHITE (click to start)")
   const [liftedCheckerPos, setLiftedCheckerPos] = useState(null)
-  const [difficulty, setDifficulty] = useState(localStorage.getItem('difficulty') ? parseInt(localStorage.getItem('difficulty')) : 1)
   const [gameHasStarted, setGameHasStarted] = useState(false)
-  const [gameIsActive, setGameIsActive] = useState(true)
+  const [difficulty, setDifficulty] = useState(localStorage.getItem('difficulty') ? parseInt(localStorage.getItem('difficulty')) : 1)
   const [isMyMove, setIsMyMove] = useState(myColor == 'b')
   const [board, setBoard] = useState([
     ['', 'w', '', 'w', ''],
@@ -28,28 +27,25 @@ const App = () => {
   }, [difficulty])
 
   useEffect(() => {
-    const isGameEnd = checkGameEnd()
+    checkGameEnd()
+  }, [board, boardHistory])
 
-    setTimeout(() => {
-      if (gameHasStarted && !isMyMove && !isGameEnd) {
+  useEffect(() => {
+    if (!isMyMove && gameHasStarted && !checkGameEnd()) {
+      setTimeout(() => {
         robotMove()
 
         setIsMyMove(true)
-      }
-    }, timeout);
-
+      }, timeout)
+    }
   }, [isMyMove, gameHasStarted])
-
-  useEffect(() => {
-    setBoardHistory((prev) => ([...prev, board]))
-  }, [board])
 
   const onCellClick = (row, col) => {
     if (!gameHasStarted) {
       setGameHasStarted(true)
     }
 
-    if (!gameIsActive) {
+    if (checkGameEnd()) {
       return
     }
 
@@ -96,6 +92,7 @@ const App = () => {
     const robotColor = getOpponentColor(myColor)
 
     const [fromRow, fromCol, toRow, toCol] = Robot.getNextMove(board, robotColor, difficulty)
+
     placeChecker(fromRow, fromCol, toRow, toCol)
   }
 
@@ -107,9 +104,12 @@ const App = () => {
     tempBoard[toRow][toCol] = temp
 
     setBoard(tempBoard)
+
+    setBoardHistory((prev) => ([...prev, tempBoard]))
   }
 
   const checkDraw = () => {
+    console.log(boardHistory)
     return countOccurrences(boardHistory, board) >= 3
   }
 
@@ -117,10 +117,6 @@ const App = () => {
     const winColor = checkWin(board)
     const isDraw = checkDraw(board)
     const isEnd = isDraw || winColor != null
-
-    if (isEnd) {
-      setGameIsActive(false)
-    }
 
     if (winColor != null) {
       setMessageText(winColor == 'b' ? "BLACK WINS" : "WHITE WINS")
@@ -131,7 +127,7 @@ const App = () => {
     return isEnd
   }
 
-  const countOccurrences = (arr, val) => arr.reduce((a, v) => (v === val ? a + 1 : a), 0)
+  const countOccurrences = (arr, val) => arr.reduce((a, v) => (JSON.stringify(v) === JSON.stringify(val) ? a + 1 : a), 0)
 
   return (
     <div className="flex flex-col justify-center items-center h-screen">
